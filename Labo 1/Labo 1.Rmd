@@ -1,0 +1,43 @@
+---
+title: "Labo 1"
+author: "Sten Hulsbergen"
+date: "`r Sys.Date()`"
+output: html_document
+---
+# Gasoline
+```{r setup, include=FALSE}
+library(AER)
+library(magrittr)
+library(data.table)
+library(knitr)
+library(reticulate)
+
+data(Arrests)
+```
+
+```{r}
+(Arrests <- Arrests %>% as.data.table)
+```
+
+# Data.table
+```{r}
+Arrests[order(year), .(`Mean age`= mean(age)), year] %>% plot(type = "line")
+```
+
+# Densiteit van de leeftijd
+```{r}
+(age_log <- Arrests$age) %>% head
+```
+
+```{python}
+age_lin = [(elem) for elem in r.age_log]
+```
+
+```{r}
+py$age_lin %>% density %>% plot(main="Densiteit van de leeftijd")
+```
+
+# Conclusie
+#### De gemiddelde leeftijd is rond de 20.
+
+
