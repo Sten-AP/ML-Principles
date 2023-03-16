@@ -1,0 +1,34 @@
+---
+title: 'Labo 2: Data & variabelen'
+author: "Sten Hulsbergen"
+date: "2023-03-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(AER)
+library(magrittr)
+library(data.table)
+library(knitr)
+library(reticulate)
+library(datasets)
+library(glmnet)
+library(mice)
+
+set.seed(42)
+
+opts_chunk$set(echo = TRUE)
+```
+# Deel 1: een eenvoudige dataset
+## Data (tabel en interpretatie)
+```{r}
+data(cars)
+setDT(cars)
+cars %>% as.data.table
+hist(cars$speed, xlab = "Speed", main = "Car speed")
+plot(cars$speed, cars$dist, type = "line", xlab = "Speed", ylab="Dist")
+typeof(cars$speed)
+typeof(cars$dist)
+
+```
+
