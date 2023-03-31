@@ -1,0 +1,72 @@
+---
+title: 'Labo 3: univariate analysis'
+author: "Sten Hulsbergen"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(AER)
+library(magrittr)
+library(data.table)
+library(knitr)
+library(reticulate)
+library(datasets)
+library(glmnet)
+library(mice)
+library(readr)
+
+set.seed(42)
+
+opts_chunk$set(echo = TRUE)
+
+austpop <- read_csv("austpop.csv")
+```
+
+```{r}
+setDT(austpop)
+austpop %>% as.data.table
+
+plot(austpop$SA, austpop$year, xlab = "Population", ylab="Year", main="Fig. 1: Population in SA")
+plot(austpop$ACT, austpop$year, xlab = "Population", ylab="Year", main="Fig. 2: Population in ACT")
+```
+
+# Conclusie
+
+## Wat kan je concluderen uit de 2 plots over de bevolkingsdata in SA en ACT? Wat zijn de verschillen?
+#### De populatie in ACT bleef bijna hetzelfde in het begin terwijl SA een beetje meer groeide, maar sinds 1960 is de groei ongeveer gelijk aan elkaar. SA heeft in het algemeen een grotere populatie tegenover ACT.
+
+## Wat is het datatype?
+``` {r}
+typeof(austpop$SA)
+typeof(austpop$ACT)
+```
+
+## Kijk naar de verdeling in Figuur 2. Volgt dit volgens jou de normale verdeling? Normaal verdeelde data heeft de volgende eigenschappen: Observaties rond het gemiddelde zijn het waarschijnlijkst. Hoe verder waardes van het gemiddelde af liggen, hoe onwaarschijnlijker het is deze waarden te observeren.
+``` {r}
+typeof(austpop$SA)
+typeof(austpop$ACT)
+```
+## Zijn er limieten waartussen de waarden zich bevinden? Zo ja, welke?
+#### SA
+``` {r}
+min(austpop$SA)
+max(austpop$SA)
+```
+#### ACT
+``` {r}
+min(austpop$ACT)
+max(austpop$ACT)
+```
+## Wat zijn de modi in beide figuren? Een modus is de waarde die het meeste voorkomt.
+``` {r}
+getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+```
+
+``` {r}
+getmode(austpop$SA)
+getmode(austpop$ACT)
+```

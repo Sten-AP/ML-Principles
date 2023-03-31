@@ -26,9 +26,62 @@ data(cars)
 setDT(cars)
 cars %>% as.data.table
 hist(cars$speed, xlab = "Speed", main = "Car speed")
-plot(cars$speed, cars$dist, type = "line", xlab = "Speed", ylab="Dist")
-typeof(cars$speed)
-typeof(cars$dist)
-
+plot(cars$speed, cars$dist, xlab = "Speed", ylab="Distance")
 ```
 
+```{r}
+typeof(cars$speed)
+typeof(cars$dist)
+```
+
+```{r}
+cars$speed <- as.integer(cars$speed)
+cars$dist <- as.integer(cars$dist)
+typeof(cars$speed)
+typeof(cars$dist)
+```
+
+```{r}
+max(cars$speed)
+min(cars$speed)
+```
+
+```{r}
+hist(cars$dist, xlab = "Distance", main = "Car distance")
+```
+
+## Conclusie
+##### De data is volledig en uit de data kan worden gezien dat de stop-afstand groter wordt naarmate de snelheid toeneemt.
+
+# Deel 2
+```{r}
+boston <- read.csv("Boston.csv")
+setDT(boston)
+boston %>% as.data.table
+hist(boston$tax, xlab = "Tax", main = "Tax rate per $10.000")
+plot(boston$tax, boston$indus, xlab = "Tax per $10.000", ylab="Industrial acres")
+```
+
+```{r}
+typeof(boston$tax)
+typeof(boston$indus)
+```
+
+```{r}
+boston$tax <- as.double(boston$tax)
+boston$indus <- as.integer(boston$indus)
+typeof(boston$tax)
+typeof(boston$indus)
+```
+
+```{r}
+max(boston$tax)
+min(boston$tax)
+```
+
+```{r}
+hist(boston$indus, xlab = "Acres", main = "Industrial acres")
+```
+
+## Conclusie
+##### De data is volledig en uit de data kan worden gezien dat de tax meer wordt naarmate het aantal industriele hectaren toeneemt.
