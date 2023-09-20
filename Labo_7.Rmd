@@ -1,0 +1,187 @@
+---
+title: "Labo 7"
+author: "Sten Hulsbergen"
+date: "12-12-2021"
+output: html_document
+---
+
+# Deel 1
+
+```{r include=FALSE}
+library(magrittr)
+library(data.table)
+library(knitr)
+library(readr)
+library(reticulate)
+library(funModeling)
+library(corrplot)
+library(Metrics)
+library(glmnet)
+
+set.seed(1)
+
+knitr::opts_chunk$set(echo = TRUE)
+
+opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+## Data exploratie
+
+```{r echo=FALSE}
+data_winequality_white <- read.csv("Data - winequality-white.csv", header=TRUE, sep=";")
+data_winequality_white <- setDT(data_winequality_white)
+data_winequality_white %>% head()
+```
+
+```{r echo=FALSE}
+data_winequality_red <- read.csv("Data - winequality-red.csv", header=TRUE, sep=";")
+data_winequality_red <- setDT(data_winequality_red)
+data_winequality_red %>% head()
+```
+
+```{r echo=FALSE}
+summary(data_winequality_white)
+summary(data_winequality_red)
+```
+
+```{r echo=FALSE}
+data_winequality_white$fixed.acidity %>% 
+  hist(main="Histogram of fixed acidity white wine", xlab="fixed acidity (g/dm^3)")
+
+data_winequality_white$volatile.acidity %>% 
+  hist(main="Histogram of volatile acidity white wine", xlab="volatile acidity (g/dm^3)")
+
+data_winequality_white$citric.acid %>% 
+  hist(main="Histogram of citric acidity white wine", xlab="citric acidity (g/dm^3)")
+
+data_winequality_white$residual.sugar %>% 
+  hist(main="Histogram of residual sugar white wine", xlab="residual sugar (g/dm^3)")
+
+data_winequality_red$residual.sugar %>% 
+  hist(main="Histogram of residual sugar red wine", xlab="residual sugar (g/dm^3)")
+
+data_winequality_white$chlorides %>% 
+  hist(main="Histogram of chlorides white wine", xlab="chlorides (g/dm^3)")
+
+data_winequality_white$total.sulfur.dioxide %>% 
+  hist(main="Histogram of sulfur dioxide white wine", xlab="sulfur dioxide (g/dm^3)")
+
+data_winequality_white$density %>% 
+  hist(main="Histogram of density white wine", xlab="density (g/dm^3)")
+
+data_winequality_white$pH %>% 
+  hist(main="Histogram of pH white wine", xlab="pH")
+
+data_winequality_white$sulphates %>% 
+  hist(main="Histogram of sulphates white wine", xlab="sulphates (g/dm^3)")
+
+data_winequality_white$alcohol %>% 
+  hist(main="Histogram of alcohol percentage white wine", xlab="alcohol percentage")
+
+data_winequality_white$quality %>% 
+  hist(main="Histogram of quality white wine", xlab="quality")
+```
+
+```{r echo=FALSE}
+data_winequality_white %>% sapply(class)
+colSums(is.na(data_winequality_white))
+```
+
+```{r echo=FALSE}
+cor_matrix <- cor(data_winequality_white)
+
+corrplot(cor_matrix, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+```
+
+```{r echo=FALSE}
+correlation_table(data_winequality_white, "quality")
+```
+
+# Regressie
+## LM() algoritme
+
+```{r echo=FALSE}
+dt_red = sort(sample(nrow(data_winequality_red), nrow(data_winequality_red)*.8))
+traindata_red <- data_winequality_red[dt_red,]
+testdata_red <- data_winequality_red[-dt_red,]
+
+model_red <- lm(quality ~., data= traindata_red)
+
+prediction_quality_red <- predict(model_red, newdata = testdata_red)
+
+result_red <- data.frame(testdata_red$quality, prediction_quality_red, margin_of_error = testdata_red$quality - prediction_quality_red)
+
+head(result_red)
+```
+
+```{r echo=FALSE}
+dt_white = sort(sample(nrow(data_winequality_white), nrow(data_winequality_white)*.8))
+traindata_white <- data_winequality_white[dt_white,]
+testdata_white <- data_winequality_white[-dt_white,]
+
+model_white <- lm(quality ~., data= traindata_white)
+
+prediction_quality_white <- predict(model_white, newdata = testdata_white)
+
+result_white <- data.frame(testdata_white$quality, prediction_quality_white, margin_of_error = testdata_white$quality - prediction_quality_white)
+
+head(result_white)
+```
+
+```{r echo=FALSE}
+mae_white <- mae(prediction_quality_white, testdata_white$quality)
+print(mae_white)
+```
+
+## Glmnet algoritme
+
+```{r echo=FALSE}
+trn_red <- runif(1:nrow(data_winequality_red)) < .75
+
+x_trn_red <- data_winequality_red[trn_red, .(fixed.acidity, volatile.acidity, citric.acid, residual.sugar, chlorides, free.sulfur.dioxide, total.sulfur.dioxide, density, pH, sulphates, alcohol)]
+y_trn_red <- data_winequality_red[trn_red, quality]
+
+x_tst_red <- data_winequality_red[!trn_red, .(fixed.acidity, volatile.acidity, citric.acid, residual.sugar, chlorides, free.sulfur.dioxide, total.sulfur.dioxide, density, pH, sulphates, alcohol)]
+y_tst_red <- data_winequality_red[!trn_red, quality]
+```
+
+```{r echo=FALSE}
+trn_white <- runif(1:nrow(data_winequality_white)) < .75
+
+x_trn_white <- data_winequality_white[trn_white, .(fixed.acidity, volatile.acidity, citric.acid, residual.sugar, chlorides, free.sulfur.dioxide, total.sulfur.dioxide, density, pH, sulphates, alcohol)]
+y_trn_white <- data_winequality_white[trn_white, quality]
+
+x_tst_white <- data_winequality_white[!trn_white, .(fixed.acidity, volatile.acidity, citric.acid, residual.sugar, chlorides, free.sulfur.dioxide, total.sulfur.dioxide, density, pH, sulphates, alcohol)]
+y_tst_white <- data_winequality_white[!trn_white, quality]
+```
+
+```{r echo=FALSE}
+model_red_glmnet <- glmnet(x_trn_red, y_trn_red)
+
+y_tst_hat_red <- model_red_glmnet %>% 
+  predict(x_tst_red %>% as.matrix) %>% 
+  extract(, ncol(.))
+
+mae <- function(x, y) {mean(abs(y - x))}
+
+mae_red_glmnet <- mae(y_tst_hat_red, y_tst_red)
+print(mae_red_glmnet)
+```
+
+```{r echo=FALSE}
+model_white_glmnet <- glmnet(x_trn_white, y_trn_white)
+
+y_tst_hat_white <- model_white_glmnet %>% 
+  predict(x_tst_white %>% as.matrix) %>% 
+  extract(, ncol(.))
+
+mae <- function(x, y) {mean(abs(y - x))}
+
+mae_white_glmnet <- mae(y_tst_hat_white, y_tst_white)
+print(mae_white_glmnet)
+```
+
+
+
+

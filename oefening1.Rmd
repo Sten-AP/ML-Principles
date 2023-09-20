@@ -1,0 +1,50 @@
+---
+title: "oefening1"
+output: html_document
+---
+
+## Gasoline
+
+```{r librarys, include=FALSE}
+library(AER)
+library(magrittr)
+library(data.table)
+library(knitr)
+library(reticulate)
+
+data(OECDGas)
+```
+
+```{r, echo=FALSE}
+(OECDGas <- OECDGas %>% as.data.table)
+```
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data.table
+
+```{r, echo=FALSE}
+OECDGas[order(year), .(`Mean price`= mean(price)), year] %>%
+  plot(type = "line")
+```
+
+## Densiteit van prijs
+
+```{r cars, echo=FALSE}
+summary((prices_log <- OECDGas$price) %>% head)
+```
+
+```{python include=FALSE}
+prices_lin = [10**(elem) for elem in r.prices_log]
+```
+
+```{r, echo=FALSE}
+py$prices_lin %>% density %>%
+  plot(main="Densiteit van prijs")
+```
+
+## Conclusie
+
+Het gemiddelde is 0,73.

@@ -1,0 +1,376 @@
+---
+title: 'Labo 8: Jobkansen datawetenschappers'
+author: "Sten Hulsbergen"
+date: "25-12-2021"
+output: html_document
+---
+
+```{r include=FALSE}
+library(magrittr)
+library(data.table)
+library(knitr)
+library(reticulate)
+library(tidyverse)
+library(kableExtra)
+library(xgboost)
+library(SHAPforxgboost)
+library(caret)
+library(plotly)
+library(naniar)
+library(forcats)
+library(scales)
+library(lsr)
+library(wesanderson)
+library(e1071)
+library(ggthemes)
+
+set.seed(42)
+```
+
+## Waar gaat de dataset precies over?
+Personen in verschillende steden met een andere achtergrond die eventueel werk hebben of werk zoeken.
+
+## Waarom zijn er drie bestanden?
+Een bestand om te leren, een bestand om te testen en de uitkomsten.
+Omdat bij het leren de dataset verranderd kan worden en bij het testen word dan het originele gebruikt.
+
+## Wat beteken de variabelen
+
+```{r echo=FALSE}
+trainData <- read.csv("aug_train.csv", header=TRUE, sep=",")
+trainData <- setDT(trainData)
+trainData[order(trainData$enrollee_id)] %>% head()
+
+testData <- read.csv("aug_test.csv", header=TRUE, sep=",")
+testData <- setDT(testData)
+testData[order(testData$enrollee_id)] %>% head()
+
+sampleData <- read.csv("sample_submission.csv", header=TRUE, sep=",")
+sampleData <- setDT(sampleData)
+sampleData[order(sampleData$enrollee_id)] %>% head()
+```
+
+# Data exploratie
+
+```{r echo=FALSE}
+trainData %>% str()
+testData %>% str()
+sampleData %>% str()
+```
+
+
+```{r echo=FALSE}
+trainData[, `city_development_index`] %>% 
+  density %>% 
+  plot (main="Development steden", xlab="index", ylab="Aantal steden")
+trainData[, `training_hours`] %>% 
+  density %>% 
+  plot (main="Training uren per persoon", xlab="Uren", ylab="Aantal personen")
+
+trainData %>% 
+  group_by(gender) %>%
+  summarise(count = n()) %>% 
+  mutate(ratio = count / sum(count),
+         label = percent(ratio %>% round(2))) %>%
+  ggplot(aes(x = gender, y = count, fill=gender)) +
+  geom_bar(stat = "identity", color = 'black') +
+  scale_fill_manual(values = wes_palette("IsleofDogs1")) +
+  geom_label(aes(label=label), fill="#FFF9F5", colour = "black",
+             fontface = "italic", vjust = 0.5) +
+  theme_hc() +
+  theme(plot.title=element_text(size=30, face="bold", hjust = 0.5),
+        plot.subtitle=element_text(size=22, hjust = 0.5),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(vjust = 5, 
+                                   hjust = 0.5, 
+                                   size = 14),
+        axis.text.y = element_text(size = 16),
+        legend.position = "top",
+        legend.title=element_blank(),
+        legend.text=element_text(size=18)) +
+  theme(legend.position="none")+
+  labs(title = "Gender distribution")
+
+trainData %>% 
+  group_by(education_level, gender) %>% 
+  summarise(count = n()) %>% 
+  mutate(ratio = count / sum(count),
+         label = percent(ratio %>% round(2))) %>% 
+  mutate(education_level = factor(education_level, 
+                                  levels = c("Primary School",
+                                             "High School",
+                                             "Graduate",
+                                             "Masters",
+                                             "Phd"))) %>% 
+  filter(education_level != 'NA') %>% 
+  ggplot(aes(x=gender, y=count, fill=gender)) + 
+  geom_bar(stat='identity', color = 'black') +
+  scale_fill_manual(values = wes_palette("IsleofDogs1")) +
+  facet_wrap(~ education_level, scales = "free") +
+  geom_label(aes(label=label), fill="#FFF9F5", colour = "black",
+             fontface = "italic", vjust = 0.5) +
+  theme_hc() +
+  theme(plot.title=element_text(size=30, face="bold", hjust = 0.5),
+        plot.subtitle=element_text(size=22, hjust = 0.5),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(vjust = 5, 
+                                   hjust = 0.5, 
+                                   size = 14),
+        axis.text.y = element_text(size = 16),
+        legend.position = "top",
+        legend.title=element_blank(),
+        legend.text=element_text(size=18),
+        strip.background = element_rect(fill = 'white')) +
+  theme(legend.position="none")+
+  theme(axis.text.x = element_text(vjust = 1, 
+                                   hjust = 0.5, 
+                                   size = 12)) +
+  theme(strip.text = element_text(colour = 'black', size = 18)) +
+  labs(title = "Education level by gender")
+```
+
+# Voorspelling
+
+```{r echo=FALSE}
+workModel <- trainData %>% 
+  select(-enrollee_id, -city) %>% 
+  mutate(city_development_index = 
+           as.numeric(as.character(city_development_index))) %>% 
+  mutate(training_hours = 
+           as.numeric(as.character(training_hours))) %>%
+  mutate(target = 
+           as.numeric(as.character(target)))
+
+workModel$gender = 
+  ifelse(workModel$gender == "Male", 1,
+  ifelse(workModel$gender == "Female", 2, 0))
+
+workModel$relevant_experience = 
+  ifelse(workModel$relevant_experience == "Has relevant experience", 1, 0)
+
+workModel$enrolled_university = 
+  ifelse(workModel$enrolled_university == "no_enrollment",0,
+  ifelse(workModel$enrolled_university == "Part time course", 2, 3))
+
+workModel$education_level = 
+  ifelse(workModel$education_level == "Primary School", 0,
+  ifelse(workModel$education_level == "High School", 1,
+  ifelse(workModel$education_level == "Graduate", 2,
+  ifelse(workModel$education_level == "Masters", 3, 4))))
+
+workModel$major_discipline = 
+  ifelse(workModel$major_discipline == "No Mayor", 0,
+  ifelse(workModel$major_discipline == "Other", 1,
+  ifelse(workModel$major_discipline == "Arts", 2,
+  ifelse(workModel$major_discipline == "Business Degree", 3,
+  ifelse(workModel$major_discipline == "Humanities", 4, 5
+         )))))
+
+workModel$experience = 
+  ifelse(workModel$experience == "<1",0,
+  ifelse(workModel$experience == "1",1,
+  ifelse(workModel$experience == "2",2,
+  ifelse(workModel$experience == "3",3,
+  ifelse(workModel$experience == "4",4,
+  ifelse(workModel$experience == "5",5,
+  ifelse(workModel$experience == "6",6,
+  ifelse(workModel$experience == "7",7,
+  ifelse(workModel$experience == "8",8,
+  ifelse(workModel$experience == "9",9,
+  ifelse(workModel$experience == "10",10,
+  ifelse(workModel$experience == "11",11,
+  ifelse(workModel$experience == "12",12,
+  ifelse(workModel$experience == "13",13,
+  ifelse(workModel$experience == "14",14,
+  ifelse(workModel$experience == "15",15,
+  ifelse(workModel$experience == "16",16,
+  ifelse(workModel$experience == "17",17,
+  ifelse(workModel$experience == "18",18,
+  ifelse(workModel$experience == "19",19,
+  ifelse(workModel$experience == "20",20,21
+  )))))))))))))))))))))
+
+workModel$company_size = 
+  ifelse(workModel$company_size == "<10",0,
+  ifelse(workModel$company_size == "10/49",1,
+  ifelse(workModel$company_size == "50-99",2,
+  ifelse(workModel$company_size == "10-500",3,
+  ifelse(workModel$company_size == "500-999",4,
+  ifelse(workModel$company_size == "1000-4999",5,
+  ifelse(workModel$company_size == "5000-9999",6,7
+  )))))))
+
+workModel$company_type = 
+  ifelse(workModel$company_type == "Early Stage Startup",0,
+  ifelse(workModel$company_type == "Funded Startup",1,
+  ifelse(workModel$company_type == "NGO",2,
+  ifelse(workModel$company_type == "Public Sector",3,
+  ifelse(workModel$company_type == "Pvt Ltd",4,5
+  )))))
+
+workModel$last_new_job = 
+  ifelse(workModel$last_new_job == "never",0,
+  ifelse(workModel$last_new_job == "1",1,
+  ifelse(workModel$last_new_job == "2",2,
+  ifelse(workModel$last_new_job == "3",3,
+  ifelse(workModel$last_new_job == "4",4,5
+  )))))
+
+# Split dependents from independent variables
+y = workModel$target
+x = data.matrix(workModel[,-12])
+
+# Split data in train-validation
+numberTrain = round(length(y) * .8)
+
+train_data = x[1:numberTrain,]
+train_labels = y[1:numberTrain]
+
+val_data = x[-(1:numberTrain),]
+val_labels = y[-(1:numberTrain)]
+
+# Create Dmatrixs
+dtrain = xgb.DMatrix(data = train_data, label= train_labels)
+dval = xgb.DMatrix(data = val_data, label= val_labels)
+```
+
+```{r echo=FALSE}
+trainData %>% 
+  select(target) %>%
+  mutate_if(is.numeric, as.factor) %>%
+  group_by(target) %>%
+  summarise(Count = n())%>%
+  mutate(Ratio = Count / sum(Count),
+         label = percent(Ratio %>% round(4))) %>%
+  ggplot(aes(x = target, y = Count, fill=target)) +
+  geom_bar(stat = "identity", color = "black")+
+  geom_label(aes(label=label), fill="#FFF9F5", colour = "black",
+             fontface = "italic", vjust = 0.5)+
+  scale_fill_manual(values = c('skyblue', 'tomato')) +
+  theme_hc() +
+  theme(plot.title=element_text(size=30, face="bold", hjust = 0.5),
+        plot.subtitle=element_text(size=22, hjust = 0.5),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.x = element_text(vjust = 5, 
+                                   hjust = 0.5, 
+                                   size = 14),
+        axis.text.y = element_text(size = 16),
+        legend.position = "top",
+        legend.title=element_blank(),
+        legend.text=element_text(size=18),
+        strip.background = element_rect(fill = 'white')) +
+  scale_x_discrete(labels=c("Not searching for a job", "Searching for a job")) +
+  theme(legend.position="none")+
+  labs(title = "Target distribution")
+```
+
+```{r echo=FALSE}
+positives = sum(train_labels == 1)
+negatives = sum(train_labels == 0)
+
+params = list(max.depth = 6,
+                  objective = "binary:logitraw",
+                  eval_metric = "auc",
+                  scale_pos_weight = negatives/positives,
+                  eta = 0.1,
+                  subsample = 0.7,
+                  nthread = 16)
+
+set.seed(1234)
+xgbcv <- xgb.cv( params = params,
+                 data = dtrain,
+                 nrounds = 1000,
+                 early_stopping_rounds = 50,
+                 nfold = 5,
+                 showsd = T,
+                 maximize = T)
+
+model = xgboost(data = dtrain,
+                 params = params,
+                 nround = 27)
+
+# Make a prediction in validation data
+pred = predict(model, dval)
+
+# Let's see the error
+err = mean(as.numeric(pred > 0.5) != val_labels)
+print(paste("val-error=", err))
+```
+
+```{r echo=FALSE}
+prediction = ifelse (pred > 0.5,1,0)
+
+cm = confusionMatrix(as.factor(prediction), as.factor(val_labels))
+
+draw_confusion_matrix <- function(cm) {
+  
+  layout(matrix(c(1,1,2)))
+  par(mar=c(2,2,2,2))
+  plot(c(100, 345), c(300, 450), type = "n", xlab="", ylab="", xaxt='n', yaxt='n')
+  title('CONFUSION MATRIX', cex.main=2)
+  
+  rect(150, 430, 240, 370, col='skyblue')
+  text(195, 435, 'Not looking for a job', cex=1.2)
+  rect(250, 430, 340, 370, col='tomato')
+  text(295, 435, 'Looking for a job', cex=1.2)
+  text(125, 370, 'Prediction', cex=1.3, srt=90, font=2)
+  text(245, 450, 'Reality', cex=1.3, font=2)
+  rect(150, 305, 240, 365, col='tomato')
+  rect(250, 305, 340, 365, col='skyblue')
+  text(140, 400, 'Not looking for a job', cex=1.2, srt=90)
+  text(140, 335, 'Looking for a job', cex=1.2, srt=90)
+  
+  res <- as.numeric(cm$table)
+  text(195, 400, res[1], cex=1.6, font=2, col='white')
+  text(195, 335, res[2], cex=1.6, font=2, col='white')
+  text(295, 400, res[3], cex=1.6, font=2, col='white')
+  text(295, 335, res[4], cex=1.6, font=2, col='white')
+  
+  plot(c(100, 0), c(100, 0), type = "n", xlab="", ylab="", main = "DETAILS", xaxt='n', yaxt='n')
+  text(10, 85, names(cm$byClass[1]), cex=1.2, font=2)
+  text(10, 70, round(as.numeric(cm$byClass[1]), 3), cex=1.2)
+  text(30, 85, names(cm$byClass[2]), cex=1.2, font=2)
+  text(30, 70, round(as.numeric(cm$byClass[2]), 3), cex=1.2)
+  text(50, 85, names(cm$byClass[5]), cex=1.2, font=2)
+  text(50, 70, round(as.numeric(cm$byClass[5]), 3), cex=1.2)
+  text(70, 85, names(cm$byClass[6]), cex=1.2, font=2)
+  text(70, 70, round(as.numeric(cm$byClass[6]), 3), cex=1.2)
+  text(90, 85, names(cm$byClass[7]), cex=1.2, font=2)
+  text(90, 70, round(as.numeric(cm$byClass[7]), 3), cex=1.2)
+  
+  text(30, 35, names(cm$overall[1]), cex=1.5, font=2)
+  text(30, 20, round(as.numeric(cm$overall[1]), 3), cex=1.4)
+  text(70, 35, names(cm$overall[2]), cex=1.5, font=2)
+  text(70, 20, round(as.numeric(cm$overall[2]), 3), cex=1.4)
+}  
+
+draw_confusion_matrix(cm)
+
+xgb_importance = xgb.importance(names(x), model = model)
+
+xgb_importance %>% head(10) %>% kbl('html', 
+    caption = 'Importance of variables') %>%
+  kable_styling(bootstrap_options = c("striped", 
+                                      "hover"))
+
+# SHAP library
+shap.plot.summary.wrap1(model, X = train_data, top_n = 11)
+
+xgb.plot.shap(train_data, model = model, top_n = 11, n_col = 3)
+```
+
+
+
+
+
+
+Code van MIGUEL FZZZ
+https://www.kaggle.com/miguelfzzz/predicting-staff-turnover-xgboost-80-accuracy#exploratory-data-analysiseda
+
+

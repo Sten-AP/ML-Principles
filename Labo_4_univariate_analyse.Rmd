@@ -1,0 +1,53 @@
+---
+title: 'Labo 4: univariate analyse'
+author: "Sten Hulsbergen"
+date: "20-11-2021"
+output: html_document
+---
+
+```{r include=FALSE}
+library(magrittr)
+library(data.table)
+library(knitr)
+library(DAAG)
+
+set.seed(42)
+
+opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r echo=FALSE}
+data(austpop)
+dat <- setDT(austpop)
+print(dat)
+```
+
+```{r echo=FALSE}
+dat[order(SA), .(`Year` = mean(year)), (`Population` = SA)] %>% plot(main="Fig. 1: Population in SA")
+
+```
+
+```{r echo=FALSE}
+dat[order(ACT), .(`Year` = mean(year)), (`Population` = ACT)] %>% plot(main="Fig. 2: Population in ACT")
+```
+
+```{r echo=FALSE}
+dat <- austpop %>%
+    as.data.table %>%
+    extract(, .(SA, ACT))
+dat %>% apply(2, class)
+```
+
+
+# Conclusie
+
+ACT heeft een lagere populatie.
+Datatype is numeriek.
+Nee, dit zijn veel te weinig gegevens.
+
+
+
+
+
+
+

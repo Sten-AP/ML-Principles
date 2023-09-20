@@ -1,0 +1,82 @@
+---
+title: 'Labo 5: correlatiematrices, geavanceerde data-analyse en data-manipulatie'
+author: "Sten Hulsbergen"
+date: "26-11-2021"
+output: html_document
+---
+
+# Deel 1
+
+```{r include=FALSE}
+library(AER)
+library(magrittr)
+library(data.table)
+library(knitr)
+library(reticulate)
+library(datasets)
+library(MASS)
+library(glmnet)
+library(mice)
+library(corrplot)
+set.seed(42)
+```
+
+```{r echo=FALSE}
+data_winequality_white <- read.csv("Data - winequality-white.csv", header=TRUE, sep=";")
+data_winequality_white <- setDT(data_winequality_white)
+str(data_winequality_white)
+```
+
+```{r echo=FALSE}
+cor_matrix <- cor(data_winequality_white)
+
+corrplot(cor_matrix, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+```
+
+# Deel 2
+
+```{r echo=FALSE}
+data_winequality_red <- read.csv("Data - winequality-red.csv", header=TRUE, sep=";")
+data_winequality_red <- setDT(data_winequality_red)
+data_winequality_red %>% apply(2, class)
+```
+
+```{r echo=FALSE}
+colSums(is.na(data_winequality_red))
+table(data_winequality_red$quality) %>% 
+  barplot(main="Verdeling (0...10)", ylab="Aantal", col=c("darkorange","darkgreen"))
+```
+
+
+```{r echo=FALSE}
+data_winequality_red[, pH] %>% 
+  density %>% 
+  plot (main="Verdeling pH red")
+```
+
+```{r echo=FALSE}
+data_winequality_white[, pH] %>% 
+  density %>% 
+  plot (main="Verdeling pH white")
+```
+
+```{r echo=FALSE}
+data_winequality_red[, citric.acid] %>%
+  density %>%
+  plot (main="Residual sugar (g/L)")
+```
+
+# Conclusie
+
+#### Wat is de afhankelijke variabele?
+Numeric
+
+#### Benoem een aantal onafhankelijke variabelen
+Integer, decimal, ...
+
+#### Hebben de 2 datasets dezelfde variabelen?
+Ja
+
+#### Voor welk doel zou je deze datasets kunnen gebruiken als je ze in een ML model zou integreren?
+Wijnen leren onderscheiden.

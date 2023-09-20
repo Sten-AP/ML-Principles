@@ -1,0 +1,31 @@
+---
+title: "Labo 6: Covid-19 dataset en het glmnet package"
+author: "Sten Hulsbergen"
+date: "2-12-2021"
+output: html_document
+---
+
+# Deel 1
+
+```{r include=FALSE}
+library(magrittr)
+library(data.table)
+library(knitr)
+library(reticulate)
+library(glmnet)
+library(mice)
+
+set.seed(42)
+```
+
+```{r echo=FALSE}
+data <- read.csv("vaccine.csv", header=TRUE, sep=",")
+str(data)
+print(data)
+```
+
+# Deel 2
+
+
+
+

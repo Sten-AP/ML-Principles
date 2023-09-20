@@ -1,0 +1,106 @@
+---
+title: "Labo 3: Data & variabelen"
+author: "Sten Hulsbergen"
+date: "2021-10-31"
+output: html_document
+---
+
+```{r include=FALSE}
+library(AER)
+library(magrittr)
+library(data.table)
+library(knitr)
+library(reticulate)
+library(datasets)
+library(MASS)
+library(glmnet)
+library(mice)
+
+set.seed(42)
+
+opts_chunk$set(echo = TRUE)
+```
+
+## Data (tabel en interpretatie)
+
+```{r echo=FALSE}
+data(cars)
+cars <- setDT(cars)
+
+print(cars)
+
+cars$speed %>% hist(main="Speed")
+
+plot(cars, main="Speed/dist")
+```
+
+## Datatypes controleren
+
+```{r}
+is.numeric(cars$speed)
+is.numeric(cars$dist)
+
+storage.mode(cars$speed) <- "integer"
+storage.mode(cars$dist) <- "integer"
+
+is.integer(cars$speed)
+is.integer(cars$dist)
+```
+
+```{r}
+min(cars$speed)
+max(cars$speed)
+min(cars$dist)
+max(cars$dist)
+```
+
+```{r echo=FALSE}
+cars$dist %>% hist(main="dist")
+```
+
+## Conclusie
+
+De histogram speed is numeriek discreet lineair, de x-as word rechtlijnig opgeteld.
+De aantal keren van afstand verschild.
+De meeste gegevens zitten ongeveer in het midden, maar enkele die traag of snel reden.
+
+De gegevens zijn duidelijk. De inhoud is vrij klein. De privacy is niet geschonden. De kwaliteit is best goed. Geen tendentieuze data. Niets ontbreekt. De data is representatief en relevant.
+
+
+
+# Deel 2
+
+## Data exploratie
+
+```{r echo=FALSE}
+#?Boston
+
+data(Boston)
+Boston <- setDT(Boston)
+
+print(Boston)
+(Boston$medv * 1000) %>% hist(main="Median value")
+Boston$age %>% hist(main="Age")
+```
+
+## Datatypes controleren
+
+```{r}
+is.numeric(Boston$medv)
+is.numeric(Boston$age)
+
+storage.mode(Boston$medv) <- "integer"
+storage.mode(Boston$age) <- "integer"
+
+is.integer(Boston$medv)
+is.integer(Boston$age)
+
+min(Boston$medv * 1000)
+max(Boston$medv * 1000)
+min(Boston$age)
+max(Boston$age)
+```
+
+## Conclusie
+
+De data ziet er correct en representatief uit, privacy word niet geschonden.

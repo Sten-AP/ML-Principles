@@ -1,0 +1,83 @@
+---
+title: "Labo 2: Vertrouwen in de politie"
+author: "Sten Hulsbergen"
+date: "2021-10-14"
+output: html_document
+---
+
+```{r include=FALSE}
+library(magrittr)
+library(data.table)
+library(knitr)
+library(reticulate)
+library(stevedata)
+library(glmnet)
+library(mice)
+
+set.seed(42)
+
+opts_chunk$set(echo = TRUE)
+```
+
+## Data exploratie
+
+```{r echo=FALSE}
+data(ESSBE5)
+
+ESSBE5 <- setDT(ESSBE5)
+
+ESSBE5$plcpvcr %>% hist()
+```
+
+## Data manipulatie
+
+```{r echo=FALSE}
+dat <- ESSBE5[, .(agea, female, eduyrs, hincfel, plcpvcr, trstplc)] %>%
+  mice %>% complete %>%
+  setDT
+```
+
+```{r echo=FALSE}
+trn <- runif(nrow(ESSBE5)) < .6
+
+x_trn <- dat[trn, .(agea, female, eduyrs, hincfel, plcpvcr)] %>% as.matrix()
+y_trn <- dat[trn, trstplc]
+x_tst <- dat[!trn, .(agea, female, eduyrs, hincfel, plcpvcr)] %>% as.matrix()
+y_tst <- dat[!trn, trstplc]
+```
+
+## Machinaal leren
+
+```{r echo=FALSE}
+model_1 <- glmnet(x_trn, y_trn)
+model_1 %>% plot(lab = TRUE)
+
+model_2 <- cv.glmnet(x_trn, y_trn)
+model_2 %>% plot
+```
+
+## Voorspelling
+
+```{r}
+res <- predict(model_2, x_tst, lambda =0.4154) %>% cbind(y_tst) %>%
+  as.data.table %>% set_names(c("Y_Hat", "Y_Test"))
+```
+
+## Diagnose
+
+```{r echo=FALSE}
+rmse <- function(x1, x2){
+  sqrt(mean((x1 - x2) ^2))
+}
+
+res[, RMSE := rmse(Y_Hat, Y_Test)]
+print(res)
+```
+
+## Conclusie
+
+
+
+
+
+
